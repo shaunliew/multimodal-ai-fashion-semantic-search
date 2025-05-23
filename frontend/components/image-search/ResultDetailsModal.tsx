@@ -37,11 +37,17 @@ import {
   Shirt, 
   Brain,
   TrendingUp,
-  Info
+  Info,
+  Loader2
 } from 'lucide-react'
 import { useMediaQuery } from '@/hooks/useMediaQuery'
 import { SearchResult } from '@/stores/imageSearchStore'
 import { useResultDetailsModal } from '@/stores/modalStore'
+import { useLikedItemsStore } from '@/stores/likedItemsStore'
+import { useImageZoomStore } from '@/stores/imageZoomStore'
+import { useDownloadStore } from '@/stores/downloadStore'
+import { ImageZoomModal } from './ImageZoomModal'
+import { cn } from '@/lib/utils'
 
 interface ResultDetailsModalProps {
   result: SearchResult | null
@@ -84,19 +90,79 @@ interface AIAnalysisData {
 /**
  * Learning: Responsive modal pattern using Dialog for desktop, Drawer for mobile
  * This pattern provides optimal UX for different screen sizes and interaction methods
- * Enhanced with Zustand for centralized tab state management
+ * Enhanced with multiple Zustand stores for centralized state management
  */
 export const ResultDetailsModal = ({ result, isOpen, onClose }: ResultDetailsModalProps) => {
   const isDesktop = useMediaQuery('(min-width: 768px)')
   
   /**
-   * Learning: Using Zustand store for tab state management
-   * This demonstrates how to integrate centralized state management for UI state
-   * while still allowing the component to be controlled via props
+   * Learning: Using multiple Zustand stores for different concerns
+   * - useResultDetailsModal: Tab state management
+   * - useLikedItemsStore: Favorites functionality  
+   * - useImageZoomStore: Zoom modal functionality
+   * - useDownloadStore: Download state and progress tracking
+   * This demonstrates how to compose multiple stores in a single component
    */
   const { activeTab, setActiveTab } = useResultDetailsModal()
+  const { isLiked, toggleLike } = useLikedItemsStore()
+  const { openZoomModal } = useImageZoomStore()
+
+  /**
+   * Learning: Download store integration replaces useState hooks
+   * All download state is now managed centrally with better consistency
+   */
+  const { 
+    startDownload, 
+    isDownloading, 
+    getDownloadProgress, 
+    getDownloadStatus 
+  } = useDownloadStore()
 
   if (!result) return null
+
+  // Check if current item is liked
+  const isItemLiked = isLiked(result.id)
+
+  // Get download state for current item using store selectors
+  const itemIsDownloading = isDownloading(result.id)
+  const downloadProgress = getDownloadProgress(result.id)
+  const downloadStatus = getDownloadStatus(result.id)
+
+  /**
+   * Learning: Action handlers using Zustand store actions
+   * All handlers use store actions instead of local state management
+   */
+  const handleZoom = () => {
+    /**
+     * Learning: Opening zoom modal through Zustand store action
+     * This eliminates the need for local state and prop passing
+     */
+    openZoomModal(
+      result.imageUrl,
+      result.description,
+      result.id,
+      result.title
+    )
+  }
+
+  const handleLike = () => {
+    /**
+     * Learning: Optimistic UI updates for better perceived performance
+     * Zustand handles the state update immediately for responsive UI
+     */
+    toggleLike(result.id, {
+      imageUrl: result.imageUrl,
+      title: result.title
+    })
+  }
+
+  const handleDownload = async () => {
+    /**
+     * Learning: Enhanced download using Zustand store action
+     * All download logic is now centralized in the store with automatic state management
+     */
+    await startDownload(result.id, result.imageUrl, result.title)
+  }
 
   /**
    * Learning: Mock AI analysis data for educational purposes
@@ -149,19 +215,68 @@ export const ResultDetailsModal = ({ result, isOpen, onClose }: ResultDetailsMod
               className="object-cover"
               sizes="(max-width: 768px) 100vw, 50vw"
             />
+            {/* Download Progress Overlay - Now from Zustand store */}
+            {itemIsDownloading && (
+              <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                <div className="bg-white rounded-lg p-4 text-center">
+                  <Loader2 className="h-6 w-6 animate-spin mx-auto mb-2" />
+                  <p className="text-sm font-medium">Downloading {downloadProgress}%</p>
+                </div>
+              </div>
+            )}
           </div>
           
-          {/* Image Actions */}
+          {/* Image Actions - Enhanced with download progress */}
           <div className="flex gap-2">
-            <Button variant="outline" size="sm" className="flex-1">
+            <Button 
+              variant="outline" 
+              size="sm" 
+              className="flex-1"
+              onClick={handleZoom}
+              disabled={itemIsDownloading}
+            >
               <ZoomIn className="h-4 w-4 mr-2" />
               Zoom
             </Button>
-            <Button variant="outline" size="sm">
-              <Heart className="h-4 w-4" />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleLike}
+              disabled={itemIsDownloading}
+              className={cn(
+                "transition-colors duration-200",
+                isItemLiked 
+                  ? "text-red-500 border-red-500 hover:bg-red-50 hover:text-red-600" 
+                  : "hover:text-red-500 hover:border-red-500"
+              )}
+              title={isItemLiked ? "Remove from favorites" : "Add to favorites"}
+            >
+              <Heart className={cn("h-4 w-4", isItemLiked && "fill-current")} />
             </Button>
-            <Button variant="outline" size="sm">
-              <Download className="h-4 w-4" />
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={handleDownload}
+              disabled={itemIsDownloading}
+              className={cn(
+                downloadStatus === 'completed' && "text-green-600 border-green-600",
+                downloadStatus === 'error' && "text-red-600 border-red-600"
+              )}
+              title={
+                itemIsDownloading 
+                  ? `Downloading ${downloadProgress}%` 
+                  : downloadStatus === 'completed'
+                  ? "Downloaded successfully"
+                  : downloadStatus === 'error'
+                  ? "Download failed - click to retry"
+                  : "Download image to your computer"
+              }
+            >
+              {itemIsDownloading ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Download className="h-4 w-4" />
+              )}
             </Button>
           </div>
         </div>
@@ -192,6 +307,59 @@ export const ResultDetailsModal = ({ result, isOpen, onClose }: ResultDetailsMod
             </CardContent>
           </Card>
 
+          {/* Like Status Indicator */}
+          {isItemLiked && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Heart className="h-4 w-4 text-red-500 fill-current" />
+                  <span className="text-sm font-medium text-red-700">
+                    Added to your favorites
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Download Status Indicators - Now from Zustand store */}
+          {itemIsDownloading && (
+            <Card className="border-blue-200 bg-blue-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Loader2 className="h-4 w-4 text-blue-500 animate-spin" />
+                  <span className="text-sm font-medium text-blue-700">
+                    Downloading image... {downloadProgress}%
+                  </span>
+                </div>
+                <Progress value={downloadProgress} className="h-2 mt-2" />
+              </CardContent>
+            </Card>
+          )}
+          {downloadStatus === 'completed' && (
+            <Card className="border-green-200 bg-green-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 text-green-500" />
+                  <span className="text-sm font-medium text-green-700">
+                    Image downloaded successfully
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+          {downloadStatus === 'error' && (
+            <Card className="border-red-200 bg-red-50">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-2">
+                  <Download className="h-4 w-4 text-red-500" />
+                  <span className="text-sm font-medium text-red-700">
+                    Download failed - click to retry
+                  </span>
+                </div>
+              </CardContent>
+            </Card>
+          )}
+
           {/* Tags */}
           {result.metadata.tags.length > 0 && (
             <div>
@@ -208,7 +376,7 @@ export const ResultDetailsModal = ({ result, isOpen, onClose }: ResultDetailsMod
         </div>
       </div>
 
-      {/* AI Analysis Tabs - Now controlled by Zustand store */}
+      {/* AI Analysis Tabs - Controlled by Zustand store */}
       <Tabs 
         value={activeTab} 
         onValueChange={(value) => {
@@ -251,39 +419,49 @@ export const ResultDetailsModal = ({ result, isOpen, onClose }: ResultDetailsMod
 
   if (isDesktop) {
     return (
-      <Dialog open={isOpen} onOpenChange={onClose}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <DialogHeader>
-            <DialogTitle>Product Analysis</DialogTitle>
-            <DialogDescription>
-              Detailed AI analysis and vector similarity breakdown
-            </DialogDescription>
-          </DialogHeader>
-          <ModalContent />
-        </DialogContent>
-      </Dialog>
+      <>
+        <Dialog open={isOpen} onOpenChange={onClose}>
+          <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>Product Analysis</DialogTitle>
+              <DialogDescription>
+                Detailed AI analysis and vector similarity breakdown
+              </DialogDescription>
+            </DialogHeader>
+            <ModalContent />
+          </DialogContent>
+        </Dialog>
+        
+        {/* Zoom Modal - Now managed entirely by Zustand store */}
+        <ImageZoomModal onDownload={handleDownload} />
+      </>
     )
   }
 
   return (
-    <Drawer open={isOpen} onOpenChange={onClose}>
-      <DrawerContent className="max-h-[90vh]">
-        <DrawerHeader>
-          <DrawerTitle>Product Analysis</DrawerTitle>
-          <DrawerDescription>
-            Detailed AI analysis and vector similarity breakdown
-          </DrawerDescription>
-        </DrawerHeader>
-        <div className="px-4 pb-6 overflow-y-auto">
-          <ModalContent />
-        </div>
-        <DrawerFooter>
-          <DrawerClose asChild>
-            <Button variant="outline">Close</Button>
-          </DrawerClose>
-        </DrawerFooter>
-      </DrawerContent>
-    </Drawer>
+    <>
+      <Drawer open={isOpen} onOpenChange={onClose}>
+        <DrawerContent className="max-h-[90vh]">
+          <DrawerHeader>
+            <DrawerTitle>Product Analysis</DrawerTitle>
+            <DrawerDescription>
+              Detailed AI analysis and vector similarity breakdown
+            </DrawerDescription>
+          </DrawerHeader>
+          <div className="px-4 pb-6 overflow-y-auto">
+            <ModalContent />
+          </div>
+          <DrawerFooter>
+            <DrawerClose asChild>
+              <Button variant="outline">Close</Button>
+            </DrawerClose>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
+      
+      {/* Zoom Modal - Now managed entirely by Zustand store */}
+      <ImageZoomModal onDownload={handleDownload} />
+    </>
   )
 }
 

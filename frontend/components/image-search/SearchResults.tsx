@@ -8,13 +8,15 @@
 
 import React from 'react'
 import Image from 'next/image'
-import { Heart, ExternalLink, Download, Eye } from 'lucide-react'
-import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { Heart, ExternalLink, Download, Eye, Loader2 } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
 import { useImageSearchStore, SearchResult } from '@/stores/imageSearchStore'
 import { useResultDetailsModal } from '@/stores/modalStore'
+import { useLikedItemsStore } from '@/stores/likedItemsStore'
+import { useDownloadStore } from '@/stores/downloadStore'
 import { ResultDetailsModal } from './ResultDetailsModal'
 import { cn } from '@/lib/utils'
 
@@ -114,6 +116,31 @@ interface SearchResultCardProps {
 
 const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchResultCardProps) => {
   /**
+   * Learning: Multiple Zustand stores integration in card component
+   * This demonstrates how to use multiple stores for different concerns:
+   * - useLikedItemsStore: Favorites functionality
+   * - useDownloadStore: Download state and progress tracking
+   */
+  const { isLiked, toggleLike } = useLikedItemsStore()
+  const isItemLiked = isLiked(result.id)
+
+  /**
+   * Learning: Download store integration replaces useState hooks
+   * All download state is now managed centrally with better consistency
+   */
+  const { 
+    startDownload, 
+    isDownloading, 
+    getDownloadProgress, 
+    getDownloadStatus 
+  } = useDownloadStore()
+
+  // Get download state for current item using store selectors
+  const itemIsDownloading = isDownloading(result.id)
+  const downloadProgress = getDownloadProgress(result.id)
+  const downloadStatus = getDownloadStatus(result.id)
+
+  /**
    * Learning: Similarity score visualization helps users understand AI confidence
    * Color coding provides immediate visual feedback about result quality
    */
@@ -135,23 +162,34 @@ const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchRe
 
   /**
    * Learning: Action handlers for user interactions
-   * In production, these would integrate with shopping cart, wishlist, etc.
+   * Now includes Zustand store actions for both likes and downloads
    */
   const handleViewDetailsClick = () => {
     onViewDetails(result)
   }
 
-  const handleSaveImage = () => {
-    // TODO: Add to wishlist/favorites
-    console.log('Save image:', result.id)
+  const handleLike = (e: React.MouseEvent) => {
+    /**
+     * Learning: Prevent event bubbling to avoid triggering parent click handlers
+     * This ensures only the like action is triggered, not the card click
+     */
+    e.stopPropagation()
+    
+    toggleLike(result.id, {
+      imageUrl: result.imageUrl,
+      title: result.title
+    })
   }
 
-  const handleDownload = () => {
-    // TODO: Download image (with proper attribution)
-    const link = document.createElement('a')
-    link.href = result.imageUrl
-    link.download = `fashion-item-${result.id}.jpg`
-    link.click()
+  const handleDownload = async (e: React.MouseEvent) => {
+    /**
+     * Learning: Enhanced download using Zustand store action
+     * All download logic is now centralized in the store with automatic state management
+     */
+    e.stopPropagation()
+    
+    // Use Zustand store action instead of local state management
+    await startDownload(result.id, result.imageUrl, result.title)
   }
 
   if (viewMode === 'list') {
@@ -235,18 +273,42 @@ const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchRe
               <Button 
                 size="sm" 
                 variant="secondary" 
-                onClick={handleSaveImage}
-                className="px-2"
+                onClick={handleLike}
+                className={cn(
+                  "px-2 transition-colors duration-200",
+                  isItemLiked 
+                    ? "text-red-500 hover:text-red-600" 
+                    : "hover:text-red-500"
+                )}
+                title={isItemLiked ? "Remove from favorites" : "Add to favorites"}
               >
-                <Heart className="h-4 w-4" />
+                <Heart className={cn("h-4 w-4", isItemLiked && "fill-current")} />
               </Button>
               <Button 
                 size="sm" 
                 variant="secondary" 
                 onClick={handleDownload}
-                className="px-2"
+                disabled={itemIsDownloading}
+                className={cn(
+                  "px-2",
+                  downloadStatus === 'completed' && "text-green-600",
+                  downloadStatus === 'error' && "text-red-600"
+                )}
+                title={
+                  itemIsDownloading 
+                    ? `Downloading ${downloadProgress}%` 
+                    : downloadStatus === 'completed'
+                    ? "Downloaded successfully"
+                    : downloadStatus === 'error'
+                    ? "Download failed - click to retry"
+                    : "Download image to your computer"
+                }
               >
-                <Download className="h-4 w-4" />
+                {itemIsDownloading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Download className="h-4 w-4" />
+                )}
               </Button>
             </div>
           </div>
@@ -255,12 +317,16 @@ const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchRe
     )
   }
 
-  // Grid view layout - improved for mobile
+  // Grid view layout - improved for mobile with no top white space
   return (
-    <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden">
-      <CardHeader className="p-0 relative">
-        {/* Image Container */}
-        <div className="relative aspect-[3/4] overflow-hidden bg-muted">
+    <Card className="group hover:shadow-lg transition-all duration-300 overflow-hidden p-0">
+      {/* 
+        Learning: Removed CardHeader and added p-0 to Card to eliminate all white space
+        The image container now starts at the absolute top edge of the card
+      */}
+      <div className="relative">
+        {/* Image Container - Starts at absolute top with no padding/margin */}
+        <div className="relative aspect-[3/4] overflow-hidden bg-muted rounded-t-lg">
           <Image
             src={result.imageUrl}
             alt={result.description}
@@ -287,6 +353,40 @@ const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchRe
               {Math.round(result.similarityScore * 100)}%
             </Badge>
           </div>
+
+          {/* Like Status Indicator */}
+          {isItemLiked && (
+            <div className="absolute top-3 left-3">
+              <Badge className="bg-red-500 text-white px-2 py-1">
+                <Heart className="h-3 w-3 fill-current mr-1" />
+                Liked
+              </Badge>
+            </div>
+          )}
+
+          {/* Download Status Indicators - Now from Zustand store */}
+          {itemIsDownloading && (
+            <div className="absolute bottom-3 left-3">
+              <Badge className="bg-blue-500 text-white px-2 py-1">
+                <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                {downloadProgress}%
+              </Badge>
+            </div>
+          )}
+          {downloadStatus === 'completed' && (
+            <div className="absolute bottom-3 left-3">
+              <Badge className="bg-green-500 text-white px-2 py-1">
+                Downloaded ✓
+              </Badge>
+            </div>
+          )}
+          {downloadStatus === 'error' && (
+            <div className="absolute bottom-3 left-3">
+              <Badge className="bg-red-500 text-white px-2 py-1">
+                Failed ✗
+              </Badge>
+            </div>
+          )}
 
           {/* Action Buttons Overlay */}
           <div className={cn(
@@ -320,32 +420,52 @@ const SearchResultCard = ({ result, viewMode = 'grid', onViewDetails }: SearchRe
                 <Button 
                   size="sm" 
                   variant="secondary" 
-                  onClick={handleSaveImage}
+                  onClick={handleLike}
                   className={cn(
-                    "backdrop-blur-sm",
+                    "backdrop-blur-sm transition-colors duration-200",
                     "bg-white/90 hover:bg-white border shadow-sm",
-                    "md:bg-white/80 md:hover:bg-white/90"
+                    "md:bg-white/80 md:hover:bg-white/90",
+                    isItemLiked 
+                      ? "text-red-500 hover:text-red-600" 
+                      : "hover:text-red-500"
                   )}
+                  title={isItemLiked ? "Remove from favorites" : "Add to favorites"}
                 >
-                  <Heart className="h-4 w-4" />
+                  <Heart className={cn("h-4 w-4", isItemLiked && "fill-current")} />
                 </Button>
                 <Button 
                   size="sm" 
                   variant="secondary" 
                   onClick={handleDownload}
+                  disabled={itemIsDownloading}
                   className={cn(
                     "backdrop-blur-sm",
                     "bg-white/90 hover:bg-white border shadow-sm",
-                    "md:bg-white/80 md:hover:bg-white/90"
+                    "md:bg-white/80 md:hover:bg-white/90",
+                    downloadStatus === 'completed' && "text-green-600",
+                    downloadStatus === 'error' && "text-red-600"
                   )}
+                  title={
+                    itemIsDownloading 
+                      ? `Downloading ${downloadProgress}%` 
+                      : downloadStatus === 'completed'
+                      ? "Downloaded successfully"
+                      : downloadStatus === 'error'
+                      ? "Download failed - click to retry"
+                      : "Download image to your computer"
+                  }
                 >
-                  <Download className="h-4 w-4" />
+                  {itemIsDownloading ? (
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                  ) : (
+                    <Download className="h-4 w-4" />
+                  )}
                 </Button>
               </div>
             </div>
           </div>
         </div>
-      </CardHeader>
+      </div>
 
       <CardContent className="p-4 space-y-3">
         {/* Title and Description */}
