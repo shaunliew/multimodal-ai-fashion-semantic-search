@@ -1,0 +1,73 @@
+# Ruff Configuration File for Semantic Fashion Search Backend
+# https://docs.astral.sh/ruff/configuration/
+
+# Target Python version (matches main.py requirements)
+target-version = "py310"
+
+# Line length to match main.py formatting
+line-length = 100
+
+# Enable recommended and project-relevant rules
+lint.select = [
+    "E",    # pycodestyle errors
+    "F",    # pyflakes
+    "I",    # isort (import organization)
+    "D",    # pydocstyle (docstring style)
+    "UP",   # pyupgrade
+    "N",    # pep8-naming
+    "ANN",  # flake8-annotations (type hints)
+    "B",    # flake8-bugbear
+    "C4",   # flake8-comprehensions
+    "DTZ",  # flake8-datetimez
+    "ICN",  # flake8-import-conventions
+    "ISC",  # flake8-implicit-str-concat
+    "PIE",  # flake8-pie
+    "SIM",  # flake8-simplify
+    "TCH",  # flake8-type-checking
+    "PTH",  # flake8-use-pathlib
+    "ERA",  # eradicate
+    "RUF",  # ruff-specific rules
+    "ASYNC", # flake8-async (for async/await patterns)
+]
+
+# Ignore rules that conflict with educational/learning-focused code style
+lint.ignore = [
+    "D203",     # one-blank-line-before-class (conflicts with D211)
+    "D212",     # multi-line-summary-first-line (conflicts with D213)
+    "ANN101",   # missing-type-self (not needed for self in methods)
+    "ANN102",   # missing-type-cls (not needed for cls in classmethods)
+    "D107",     # missing-docstring-in-__init__ (often handled by class docstring)
+    "ERA001",   # commented-out-code (we use educational comments)
+]
+
+# Define which files/directories to exclude from linting
+exclude = [
+    ".git",
+    ".ruff_cache",
+    "__pycache__",
+    "venv",
+    ".env",
+    "*.pyc",
+]
+
+# Per-rule configuration
+[lint.pydocstyle]
+convention = "google"  # Use Google-style docstrings as in main.py
+
+# Code formatting options (matches main.py style)
+[format]
+quote-style = "double"  # Use double quotes for strings
+indent-style = "space"  # Use spaces for indentation
+line-ending = "auto"    # Auto-detect line endings
+
+# Import organization settings (matches main.py import structure)
+[lint.isort]
+known-first-party = ["app"]  # Recognize 'app' as first-party imports
+split-on-trailing-comma = true
+
+# Type checking configuration
+[lint.flake8-type-checking]
+strict = true  # Enforce proper type checking imports
+
+# Naming conventions
+[lint.pep8-naming]
