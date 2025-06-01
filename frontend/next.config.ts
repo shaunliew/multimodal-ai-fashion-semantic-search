@@ -7,6 +7,15 @@ import { NextConfig } from 'next'
 
 const config: NextConfig = {
   /**
+   * Learning: Use src directory for better organization
+   * This tells Next.js to look for app directory inside src/
+   */
+  experimental: {
+    // Enable optimized bundling for large applications
+    optimizePackageImports: ['lucide-react'],
+  },
+
+  /**
    * Learning: Image optimization configuration
    * Next.js Image component requires explicit domains for external images
    * This ensures security and enables optimization features
@@ -25,19 +34,16 @@ const config: NextConfig = {
         hostname: 'images.unsplash.com',
         port: '',
         pathname: '/**',
+      },
+      {
+        protocol: 'http',
+        hostname: 'assets.myntassets.com',
+        port: '',
+        pathname: '/**',
       }
     ],
     // Enable modern image formats for better performance
     formats: ['image/webp', 'image/avif'],
-  },
-
-  /**
-   * Learning: Experimental features for better development experience
-   * These features improve build performance and enable advanced optimizations
-   */
-  experimental: {
-    // Enable optimized bundling for large applications
-    optimizePackageImports: ['lucide-react'],
   },
 
   /**

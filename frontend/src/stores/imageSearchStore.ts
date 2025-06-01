@@ -159,7 +159,12 @@ export const useImageSearchStore = create<ImageSearchState>()(
           return
         }
 
-        set({ isSearching: true, error: null })
+        /**
+         * Learning: Clear previous results immediately when new search starts
+         * This prevents showing stale data and improves user experience
+         * Users see only the loading state until new results arrive
+         */
+        set({ isSearching: true, error: null, results: [] })
         
         try {
           /**
@@ -207,7 +212,12 @@ export const useImageSearchStore = create<ImageSearchState>()(
           return
         }
 
-        set({ isSearching: true, error: null })
+        /**
+         * Learning: Clear previous results immediately when new search starts
+         * This prevents confusion between different search results
+         * Users get immediate feedback that a new search is in progress
+         */
+        set({ isSearching: true, error: null, results: [] })
         
         try {
           /**

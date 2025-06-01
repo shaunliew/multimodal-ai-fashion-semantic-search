@@ -5,7 +5,7 @@
  */
 
 import React from 'react'
-import { SearchInterface } from '@/components/image-search'
+import { SearchInterface } from '@/components/image-search/search-interface'
 
 /**
  * Learning: Next.js 14 App Router with Server Components by default
@@ -99,4 +99,4 @@ export const metadata = {
     description: 'Advanced fashion discovery using AI semantic search technology',
     type: 'website',
   }
-}
+} 

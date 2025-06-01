@@ -7,6 +7,7 @@
 import { create } from 'zustand'
 import { devtools } from 'zustand/middleware'
 import { SearchResult } from './imageSearchStore'
+import type { FashionProduct } from '@/types/api'
 
 /**
  * Learning: Generic modal state interface for reusability
@@ -43,10 +44,23 @@ interface ResultDetailsModalState {
 }
 
 /**
+ * Learning: Specific interface for product details modal (Fashion Product from API)
+ * This demonstrates how to handle different data types in the same modal system
+ */
+interface ProductDetailsModalState {
+  isProductDetailsOpen: boolean
+  selectedProduct: FashionProduct | null
+  
+  // Specific actions for product details modal
+  openProductDetails: (product: FashionProduct) => void
+  closeProductDetails: () => void
+}
+
+/**
  * Learning: Combined modal store interface
  * This shows how to compose multiple modal patterns in one store
  */
-interface CombinedModalState extends ModalState, ResultDetailsModalState {}
+interface CombinedModalState extends ModalState, ResultDetailsModalState, ProductDetailsModalState {}
 
 /**
  * Learning: Zustand store for centralized modal management
@@ -68,6 +82,10 @@ export const useModalStore = create<CombinedModalState>()(
       isResultDetailsOpen: false,
       selectedResult: null,
       currentTab: 'analysis',
+
+      // Product details modal specific state
+      isProductDetailsOpen: false,
+      selectedProduct: null,
 
       // Generic modal actions
       openModal: (type, data) => {
@@ -144,6 +162,39 @@ export const useModalStore = create<CombinedModalState>()(
          * Useful for complex modals with multiple views
          */
         set({ currentTab: tab })
+      },
+
+      // Product details modal specific actions
+      openProductDetails: (product) => {
+        /**
+         * Learning: Product details modal for API Fashion Products
+         * This demonstrates handling different data types in the modal system
+         */
+        set({ 
+          isProductDetailsOpen: true,
+          selectedProduct: product,
+          
+          // Also set generic modal state for consistency
+          isOpen: true,
+          modalType: 'product-details',
+          data: product
+        })
+      },
+
+      closeProductDetails: () => {
+        /**
+         * Learning: Product details modal closure with cleanup
+         * Ensures both specific and generic modal state are properly reset
+         */
+        set({ 
+          isProductDetailsOpen: false,
+          selectedProduct: null,
+          
+          // Also clear generic modal state
+          isOpen: false,
+          modalType: null,
+          data: null
+        })
       }
     }),
     { 
@@ -182,6 +233,26 @@ export const useResultDetailsModal = () => {
     openModal: openResultDetails,
     closeModal: closeResultDetails,
     setActiveTab
+  }
+}
+
+/**
+ * Hook specifically for product details modal (Fashion Product from API)
+ * This demonstrates how to create focused APIs from a centralized store
+ */
+export const useProductDetailsModal = () => {
+  const {
+    isProductDetailsOpen,
+    selectedProduct,
+    openProductDetails,
+    closeProductDetails
+  } = useModalStore()
+
+  return {
+    isOpen: isProductDetailsOpen,
+    product: selectedProduct,
+    openModal: openProductDetails,
+    closeModal: closeProductDetails
   }
 }
 
