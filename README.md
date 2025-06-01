@@ -61,3 +61,8 @@ A semantic search engine for fashion items that allows searching using both text
    ```
 
 3. Access the application at `http://localhost:3000`
+
+feature
+
+- image search
+- text search
