@@ -4,6 +4,8 @@
 
 A cutting-edge semantic search engine powered by **MongoDB Atlas Vector Search** and **HuggingFace CLIP** that revolutionizes fashion discovery through AI-powered multimodal search capabilities. Search for fashion items using natural language descriptions or upload images to find visually similar products using advanced vector embeddings and similarity matching.
 
+[Hashnode Blog Link](https://shaunliew.hashnode.dev/building-semantic-image-search-with-clip-and-mongodb-vector-search-from-concept-to-code?showSharer=true)
+
 ## 🌟 What Makes This Special
 
 This project showcases the power of **MongoDB Atlas Vector Search** combined with **HuggingFace CLIP** to demonstrate:
