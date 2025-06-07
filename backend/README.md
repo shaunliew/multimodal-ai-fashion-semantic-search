@@ -1,6 +1,6 @@
 # Semantic Fashion Image Search API
 
-A production-ready FastAPI backend for semantic fashion search using MongoDB Atlas Vector Search and CLIP embeddings.
+A production-ready FastAPI backend for semantic fashion search using MongoDB Atlas Vector Search and HuggingFace CLIP embeddings.
 
 ## 🎯 What This API Does
 
@@ -8,14 +8,15 @@ This API enables semantic search for fashion products using state-of-the-art AI 
 
 - **Text-to-Image Search**: Find fashion items by natural language description ("red floral summer dress")
 - **Image-to-Image Search**: Find visually similar products by uploading a reference image
-- **Cross-Modal Understanding**: Uses CLIP to understand both text and visual content in the same semantic space
+- **Cross-Modal Understanding**: Uses HuggingFace CLIP (`openai/clip-vit-large-patch14`) to understand both text and visual content in the same semantic space
 - **High Performance**: Optimized for large-scale fashion catalogs with vector indexing
 
 ## 🧠 Learning Concepts Demonstrated
 
 ### AI/ML Concepts
 - **Vector Embeddings**: How neural networks create semantic representations of images and text
-- **CLIP Model**: Multi-modal AI that understands both vision and language
+- **HuggingFace CLIP Model**: Multi-modal AI using Vision Transformer architecture that understands both vision and language
+- **Vision Transformer (ViT)**: Advanced architecture for processing images as sequences of patches
 - **Cosine Similarity**: Mathematical foundation for semantic similarity search
 - **Vector Databases**: Efficient storage and retrieval of high-dimensional embeddings
 
@@ -30,10 +31,11 @@ This API enables semantic search for fashion products using state-of-the-art AI 
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.10+ (3.11+ recommended)
+- **uv** package manager ([installation guide](https://docs.astral.sh/uv/getting-started/installation/))
 - MongoDB Atlas account with vector search enabled
-- 8GB+ RAM for loading CLIP model
-- (Optional) CUDA-capable GPU for faster inference
+- 8GB+ RAM for loading HuggingFace CLIP model
+- (Optional) CUDA-capable GPU or Apple Silicon (MPS) for faster inference
 
 ### Installation
 
@@ -43,21 +45,34 @@ git clone <repository-url>
 cd backend
 ```
 
-2. **Create virtual environment**
+2. **Create virtual environment (with uv)**
+```bash
+uv venv  # Creates .venv automatically
+source .venv/bin/activate  # On Windows: .venv\Scripts\activate
+```
+
+**Alternative with standard Python:**
 ```bash
 python -m venv venv
 source venv/bin/activate  # On Windows: venv\Scripts\activate
 ```
 
-3. **Install dependencies**
+3. **Install dependencies (using uv - recommended)**
 ```bash
-pip install -r requirements.txt
+uv sync  # Installs dependencies from pyproject.toml
+```
+
+**Alternative with pip:**
+```bash
+pip install -e .  # Installs from pyproject.toml
 ```
 
 4. **Set up environment variables**
 ```bash
-cp .env.example .env
-# Edit .env with your MongoDB connection string
+# Create .env file with your MongoDB connection
+touch .env
+# Add the following to .env:
+# MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
 ```
 
 5. **Run the server**
@@ -114,7 +129,7 @@ Comprehensive health check that verifies all system components are operational.
 ```http
 POST /search/text
 ```
-Find fashion items by natural language description using CLIP's text embeddings.
+Find fashion items by natural language description using HuggingFace CLIP's text embeddings.
 
 **Request Body:**
 ```json
@@ -329,18 +344,28 @@ Get comprehensive database and system statistics.
    - Request validation with Pydantic models
    - Support for both JSON and multipart form data
 
-2. **CLIP Model Integration**
-   - Model: `openai/clip-vit-large-patch14`
+2. **HuggingFace CLIP Model Integration**
+   - Model: `openai/clip-vit-large-patch14` (Vision Transformer Large)
+   - Framework: HuggingFace Transformers library
    - Generates 768-dimensional embeddings
    - Supports both text and image inputs
-   - GPU acceleration when available (CUDA/MPS)
-   - Automatic device selection
+   - Multi-device support: GPU acceleration (CUDA/MPS) and CPU fallback
+   - Automatic device selection for optimal performance
 
 3. **MongoDB Atlas Vector Search**
    - Stores fashion product metadata and embeddings
    - Performs approximate nearest neighbor search
    - Uses cosine similarity for matching
    - Scales to millions of products
+
+### Key Dependencies
+
+- **FastAPI**: Modern async web framework for building APIs
+- **HuggingFace Transformers**: Deep learning library with pre-trained CLIP model
+- **PyTorch**: Deep learning framework for model execution
+- **Motor**: Async MongoDB driver for Python
+- **Pillow**: Image processing library for handling uploads
+- **Loguru**: Advanced logging for better debugging and monitoring
 
 ## 🔧 Configuration
 
@@ -351,13 +376,6 @@ Create a `.env` file with:
 # MongoDB Configuration (Required)
 MONGODB_URI=mongodb+srv://username:password@cluster.mongodb.net/
 
-# Optional: Model Configuration
-CLIP_MODEL_NAME=openai/clip-vit-large-patch14
-DEVICE=auto  # auto, cuda, mps, or cpu
-
-# Optional: API Configuration
-MAX_RESULTS_LIMIT=100
-DEFAULT_SIMILARITY_THRESHOLD=0.0
 ```
 
 ### MongoDB Vector Index Configuration
@@ -381,7 +399,7 @@ Create a vector search index named `vector_index` in MongoDB Atlas:
 
 ### Run Tests
 ```bash
-pytest tests/ -v
+uv run ruff check
 ```
 
 ### Test with cURL
@@ -451,8 +469,8 @@ curl -X POST "http://localhost:8000/search/image/v2" \
 ### Common Issues
 
 1. **"No module named 'torch'"**
-   - Solution: `pip install torch torchvision`
-   - For GPU support: `pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118`
+   - Solution: Ensure dependencies are installed with `uv sync` or `pip install -e .`
+   - For GPU support, you may need to install PyTorch separately: `uv pip install torch torchvision --index-url https://download.pytorch.org/whl/cu118`
 
 2. **"CUDA out of memory"**
    - Solution: Use CPU mode by setting `DEVICE=cpu` in `.env`
@@ -475,59 +493,9 @@ curl -X POST "http://localhost:8000/search/image/v2" \
    - Check file size limits
    - Verify multipart form data headers
 
-## 🚀 Production Deployment
 
-### Using Docker
 
-```dockerfile
-FROM python:3.11-slim
 
-WORKDIR /app
-
-# Install system dependencies
-RUN apt-get update && apt-get install -y \
-    gcc \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Python dependencies
-COPY requirements.txt .
-RUN pip install --no-cache-dir -r requirements.txt
-
-# Copy application
-COPY . .
-
-# Run with production server
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "4"]
-```
-
-### Using Gunicorn with Uvicorn Workers
-
-```bash
-gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker \
-  --bind 0.0.0.0:8000 \
-  --timeout 120 \
-  --access-logfile - \
-  --error-logfile -
-```
-
-### Environment Recommendations
-
-- **CPU**: 4+ cores for multiple workers
-- **RAM**: 16GB+ (8GB for model + overhead)
-- **GPU**: NVIDIA GPU with 4GB+ VRAM (optional but recommended)
-- **Storage**: SSD for model loading
-- **Network**: Low latency to MongoDB Atlas cluster
-
-### Production Checklist
-
-- [ ] Set appropriate CORS origins (not "*")
-- [ ] Configure proper logging
-- [ ] Set up monitoring (Prometheus/Grafana)
-- [ ] Implement rate limiting
-- [ ] Add authentication if needed
-- [ ] Configure SSL/TLS
-- [ ] Set up health check monitoring
-- [ ] Configure auto-scaling policies
 
 ## 📊 Monitoring
 
@@ -547,24 +515,19 @@ Monitor these metrics to identify bottlenecks and optimize performance.
 - [Understanding Vector Embeddings](https://www.pinecone.io/learn/vector-embeddings/)
 - [Approximate Nearest Neighbor Search](https://www.pinecone.io/learn/what-is-similarity-search/)
 
-### CLIP Model
-- [OpenAI CLIP Paper](https://arxiv.org/abs/2103.00020)
-- [CLIP Model Card](https://huggingface.co/openai/clip-vit-large-patch14)
-- [Understanding Multimodal AI](https://huggingface.co/blog/vision_language_pretraining)
+### HuggingFace CLIP Model
+- [OpenAI CLIP Paper](https://arxiv.org/abs/2103.00020) - Original research paper
+- [HuggingFace CLIP Model](https://huggingface.co/openai/clip-vit-large-patch14) - Model card and documentation
+- [HuggingFace Transformers CLIP](https://huggingface.co/docs/transformers/model_doc/clip) - Implementation guide
+- [Vision Transformer (ViT) Paper](https://arxiv.org/abs/2010.11929) - Understanding the vision architecture
+- [Understanding Multimodal AI](https://huggingface.co/blog/vision_language_pretraining) - Technical blog
 
 ### FastAPI
 - [FastAPI Documentation](https://fastapi.tiangolo.com/)
 - [Async Python for Web Development](https://realpython.com/async-io-python/)
 - [Building Production-Ready APIs](https://testdriven.io/blog/fastapi-best-practices/)
 
-## 📄 License
-
-This project is licensed under the MIT License - see the LICENSE file for details.
-
-## 🤝 Contributing
-
-Contributions are welcome! Please read our contributing guidelines and submit pull requests to our repository.
 
 ---
 
-**Built with ❤️ for learning semantic search and modern AI applications**
+**Built with ❤️ for learning semantic search, HuggingFace CLIP, and modern AI applications**
